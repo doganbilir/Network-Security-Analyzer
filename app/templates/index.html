@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>Ağ Güvenlik Monitörü</title>
+    
+    <meta http-equiv="refresh" content="10; url=/?hours={{ active_hours }}">
+    
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <style>
+        /* ... (Mevcut CSS stillerin değişmedi) ... */
+        body { font-family: sans-serif; background-color: #222; color: #EEE; padding: 20px; }
+        h1, h2 { color: #4CAF50; border-bottom: 1px solid #555; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 8px 12px; border: 1px solid #444; text-align: left; }
+        th { background-color: #333; }
+        tr:nth-child(even) { background-color: #2a2a2a; }
+        .col-score { text-align: center; width: 10%; }
+        tr.known-bad { background-color: #611a1a !important; font-weight: bold; }
+        tr.high-score { background-color: #4d4400; }
+        
+        .time-filter { margin-bottom: 20px; padding: 10px; background-color: #333; border-radius: 5px; }
+        .time-filter a { color: #EEE; text-decoration: none; padding: 8px 12px; margin: 0 5px; border-radius: 4px; }
+        .time-filter a:hover { background-color: #555; }
+        .time-filter a.active { background-color: #4CAF50; color: #FFF; font-weight: bold; }
+
+        /* YENİ (Grafik Geliştirmesi): Grafik alanının yüksekliğini ayarla */
+        .chart-container {
+            position: relative;
+            height: 250px; /* Grafiğin yüksekliği */
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>🐍 Ağ Güvenlik Monitörü</h1>
+    </header>
+    
+    <main>
+        <div class="time-filter">
+            <strong>Zaman Aralığı:</strong>
+            <a href="/?hours=24" class="{% if active_hours == 24 %}active{% endif %}">Son 1 Gün</a>
+            <a href="/?hours=168" class="{% if active_hours == 168 %}active{% endif %}">Son 7 Gün</a>
+            <a href="/?hours=720" class="{% if active_hours == 720 %}active{% endif %}">Son 30 Gün</a>
+        </div>
+
+        <h2>Genel Bakış (Son {{ active_hours }} Saat)</h2>
+        <div class="stats-container">
+            <div class="stat-card">
+                <h3>Top 5 Hedef Port</h3>
+                
+                <div class="chart-container">
+                    <canvas id="portChart"></canvas>
+                </div>
+                
+            </div>
+        </div>
+
+        <h2>Son Olaylar (Son {{ active_hours }} Saat)</h2>
+        
+        <div class="events-container">
+            <div class="event-list">
+                <h3>Son DNS Sorguları</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Zaman</th><th>Kaynak IP</th><th>Hedef IP</th><th>Sorgu Detayı</th><th class="col-score">Skor</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for ts, src, dst, detail, score, is_bad in events_dns %}
+                            <tr class="{% if is_bad %}known-bad{% elif score > 50 %}high-score{% endif %}">
+                                <td>{% if ts is string %}{{ ts[11:19] }}{% else %}{{ ts.strftime('%H:%M:%S') }}{% endif %}</td>
+                                <td>{{ src }}</td>
+                                <td>{{ dst }}</td>
+                                <td>{{ detail }}</td>
+                                <td class="col-score">{{ score }}</td>
+                            </tr>
+                        {% else %}
+                            <tr><td colspan="5">DNS verisi yok.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            
+            <div class="event-list">
+                <h3>Son HTTP Sızıntıları (Şifresiz Veri)</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Zaman</th><th>Kaynak IP</th><th>Hedef IP</th><th>Sızıntı Detayı</th><th class="col-score">Skor</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for ts, src, dst, detail, score, is_bad in events_leaks %}
+                            <tr class="{% if is_bad %}known-bad{% elif score > 50 %}high-score{% endif %}">
+                                <td>{% if ts is string %}{{ ts[11:19] }}{% else %}{{ ts.strftime('%H:%M:%S') }}{% endif %}</td>
+                                <td>{{ src }}</td>
+                                <td>{{ dst }}</td>
+                                <td>{{ detail }}</td>
+                                <td class="col-score">{{ score }}</td>
+                            </tr>
+                        {% else %}
+                            <tr><td colspan="5">HTTP sızıntı verisi yok.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="event-list">
+                <h3>Son Şüpheli Port Olayları (Kırmızı Alarm)</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Zaman</th><th>Kaynak IP</th><th>Hedef IP</th><th>Hedef Port</th><th class="col-score">Skor</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for ts, src, dst, dport, detail, score, is_bad in events_suspicious %}
+                            <tr class="{% if is_bad %}known-bad{% elif score > 50 %}high-score{% endif %}">
+                                <td>{% if ts is string %}{{ ts[11:19] }}{% else %}{{ ts.strftime('%H:%M:%S') }}{% endif %}</td>
+                                <td>{{ src }}</td>
+                                <td>{{ dst }}</td>
+                                <td><strong>{{ dport }}</strong></td>
+                                <td class="col-score">{{ score }}</td>
+                            </tr>
+                        {% else %}
+                            <tr><td colspan="5">Şüpheli port olayı yok.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+        </div>
+    </main>
+    
+    <script>
+        (function() {
+            // Flask'tan gelen 'chart_labels' ve 'chart_data' değişkenlerini al
+            // 'tojson' filtresi, Python listelerini güvenli bir şekilde JavaScript dizilerine dönüştürür
+            const chartLabels = {{ chart_labels|tojson }};
+            const chartData = {{ chart_data|tojson }};
+
+            // Eğer veri yoksa, "Veri yok" mesajı göster
+            if (!chartData || chartData.length === 0) {
+                const ctx = document.getElementById('portChart');
+                if (ctx) {
+                    ctx.getContext('2d').fillText("Gösterilecek port verisi yok.", 50, 50);
+                }
+                return;
+            }
+
+            // Chart.js için veri seti
+            const data = {
+                labels: chartLabels,
+                datasets: [{
+                    label: 'Port Kullanımı',
+                    data: chartData,
+                    backgroundColor: [ // Renk paleti
+                        'rgba(255, 99, 132, 0.7)',
+                        'rgba(54, 162, 235, 0.7)',
+                        'rgba(255, 206, 86, 0.7)',
+                        'rgba(75, 192, 192, 0.7)',
+                        'rgba(153, 102, 255, 0.7)'
+                    ],
+                    borderColor: '#444',
+                    borderWidth: 1
+                }]
+            };
+
+            // Chart.js konfigürasyonu
+            const config = {
+                type: 'doughnut', // Grafik tipi
+                data: data,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'right', // Etiketleri sağa al
+                            labels: {
+                                color: '#EEE' // Etiket rengi
+                            }
+                        }
+                    }
+                }
+            };
+
+            // Grafiği çiz
+            const ctx = document.getElementById('portChart');
+            if (ctx) {
+                new Chart(ctx, config);
+            }
+        })();
+    </script>
+    </body>
+</html>
