@@ -1,0 +1,12 @@
+#Required libraries(Sniffing, Analysis, API Integration)
+scapy
+requests
+psycopg2-binary  # For PostgreSQL connection
+
+#For notifications and alerts(Cross-Platform Desktop Notifications)
+plyer             # For desktop notifications
+pync              # Dependency for plyer on macOS
+pyobjus           # Dependency for plyer on macOS
+
+#Web Dashboard (Frontend/Backend)
+Flask             
